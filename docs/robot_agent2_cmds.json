@@ -1,0 +1,69 @@
+{
+  "description": "robot-agent2 文件隊列指令協議（Python 腳本）",
+  "transport": {
+    "protocol": "filesystem queue",
+    "queue_dir": "incoming/",
+    "file_pattern": "cmd_*.py",
+    "sort_order": "filename ascending"
+  },
+  "commands": {
+    "home": {
+      "description": "回到初始零位",
+      "parameters": {
+        "duration": { "type": "number", "default": 2, "unit": "seconds", "description": "運動時間" }
+      },
+      "example": "interface.home(duration=2)\nprint('[Done] home')"
+    },
+    "move_to": {
+      "description": "笛卡爾空間點到點移動",
+      "parameters": {
+        "x": { "type": "number", "required": true, "unit": "mm" },
+        "y": { "type": "number", "required": true, "unit": "mm" },
+        "z": { "type": "number", "required": true, "unit": "mm" },
+        "duration": { "type": "number", "default": 3, "unit": "seconds" }
+      },
+      "example": "interface.move_to(x=250, y=0, z=300, duration=3)\nprint('[Done] move_to')"
+    },
+    "relative_move": {
+      "description": "相對座標移動",
+      "parameters": {
+        "dx": { "type": "number", "required": true, "unit": "mm" },
+        "dy": { "type": "number", "required": true, "unit": "mm" },
+        "dz": { "type": "number", "required": true, "unit": "mm" },
+        "duration": { "type": "number", "default": 2, "unit": "seconds" }
+      },
+      "example": "interface.relative_move(dx=0, dy=0, dz=-50, duration=1)\nprint('[Done] relative_move')"
+    },
+    "joint_move": {
+      "description": "單關節移動到目標脈衝",
+      "parameters": {
+        "servo_id": { "type": "integer", "required": true, "min": 1, "max": 6 },
+        "pos": { "type": "integer", "required": true, "min": 0, "max": 4095 },
+        "duration": { "type": "number", "default": 1, "unit": "seconds" }
+      },
+      "example": "interface.joint_move(servo_id=1, pos=1500, duration=1)\nprint('[Done] joint_move')"
+    },
+    "circle": {
+      "description": "在 XY 平面畫圓",
+      "parameters": {
+        "center": { "type": "array[3]", "required": true, "unit": "mm" },
+        "radius": { "type": "number", "required": true, "unit": "mm" },
+        "duration": { "type": "number", "default": 5, "unit": "seconds" }
+      },
+      "example": "interface.circle(center=(200, 0, 200), radius=50, duration=5)\nprint('[Done] circle')"
+    },
+    "line": {
+      "description": "直線插值移動",
+      "parameters": {
+        "target": { "type": "array[3]", "required": true, "unit": "mm" },
+        "duration": { "type": "number", "default": 4, "unit": "seconds" }
+      },
+      "example": "interface.line(target=(300, 0, 300), duration=4)\nprint('[Done] line')"
+    },
+    "get_status": {
+      "description": "取得當前狀態",
+      "parameters": {},
+      "example": "status = interface.get_status()\nprint(status)"
+    }
+  }
+}

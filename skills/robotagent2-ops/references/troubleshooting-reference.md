@@ -52,6 +52,41 @@ robot-agent2 目前使用世界座標系：
 
 如果看到 `[ERR]` 或 `SafetyError`，檢查 `config/config.yaml` 中的 `workspace_limits` 與 `servo_limits`。
 
+### 啟動後機械臂對運動指令沒反應
+
+**現象**：`robot_agent2.py` 已啟動，投放 `interface.home()` 或 `interface.relative_move(...)` 後機械臂不動，日誌也沒有 `[ERR]`。
+
+**原因**：NexArm ESP32 固件上電後需要數秒初始化，此期間運動指令會被忽略。
+
+**解決**：
+1. 確認 `config/config.yaml` 中：
+   ```yaml
+   warmup:
+     enabled: true
+     beep: true
+     retries: 5
+     delay: 1.0
+   ```
+2. 啟動 `robot_agent2.py` 後，等待聽到一聲蜂鳴，表示 warmup 完成。
+3. 查看日誌中是否出現 `Warmup OK: x=..., y=..., z=...`。
+4. 若 warmup 後仍不動，檢查機械臂主電源是否開啟（控制板 USB 通訊正常不代表馬達已上電）。
+
+### `get_status()` 返回全 0
+
+**現象**：`interface.get_status()` 返回 `{'x': 0, 'y': 0, 'z': 0, ...}`，導致後續 `move_to()` 因超出限位而失敗。
+
+**原因**：真機上 `get_full_state()` 偶爾超時或返回無效數據。
+
+**解決**：`NexArmInterface.get_status()` 已內建後備邏輯：
+1. 優先嘗試 `board.get_full_state()`。
+2. 若失敗，嘗試 `board.get_arm_coords()` 並用座標構造狀態。
+3. 若都失敗，返回上一次成功快取的狀態。
+
+如果仍頻繁出現，請檢查：
+- 串口連接是否穩定
+- 機械臂電源是否開啟
+- `config.yaml` 中的 `baudrate` 是否與固件一致（預設 1000000）
+
 ## 測試問題
 
 ### pytest 找不到 `src` 模組

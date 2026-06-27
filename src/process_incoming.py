@@ -81,11 +81,24 @@ class CommandExecutor:
     def is_busy(self) -> bool:
         return self._busy
 
+    def _beep(self, repeat: int = 1):
+        """發送蜂鳴器提示音；若 board 不支持則靜默跳過。"""
+        board = getattr(self.interface, "board", None)
+        if board is None or not hasattr(board, "set_buzzer"):
+            return
+        try:
+            board.set_buzzer(freq=2500, on_time_s=0.1, off_time_s=0.1, repeat=repeat)
+        except Exception:
+            pass
+
     def execute_script(self, script_path: str):
         """執行單個腳本。"""
         script_path = Path(script_path)
         self._busy = True
         self.logger.info(f"Executing {script_path.name}")
+
+        # 指令開始提示音
+        self._beep(repeat=1)
 
         try:
             state = self.interface.get_status()
@@ -98,6 +111,8 @@ class CommandExecutor:
                 source = f.read()
             exec(source, script_globals)
             self.logger.info(f"[Done] {script_path.name}")
+            # 指令成功結束提示音
+            self._beep(repeat=2)
             self._archive(script_path, success=True)
         except Exception as e:
             self.logger.error(f"[ERR] {script_path.name}: {e}")

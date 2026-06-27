@@ -42,6 +42,12 @@ class MockBoard:
     def get_full_state(self):
         return self._state
 
+    def get_arm_coords(self):
+        return (self._state["x"], self._state["y"], self._state["z"])
+
+    def set_buzzer(self, freq, on_time_s, off_time_s, repeat=1):
+        self.calls.append(("set_buzzer", (freq, on_time_s, off_time_s, repeat)))
+
 
 @pytest.fixture
 def config():

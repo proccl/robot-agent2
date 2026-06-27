@@ -68,6 +68,41 @@ def test_get_status(interface, mock_board):
     assert status["servos"] == [2048] * 6
 
 
+def test_get_status_fallback_to_arm_coords(interface, mock_board):
+    """當 get_full_state 返回 None 時，應能從 get_arm_coords 構造狀態。"""
+    mock_board.get_full_state = lambda: None
+    status = interface.get_status()
+    assert status["x"] == 200
+    assert status["y"] == 0
+    assert status["z"] == 200
+
+
+def test_get_status_returns_cached_state(interface, mock_board):
+    """當兩種讀取都失敗時，應返回上一次快取的狀態。"""
+    # 先讀取一次成功，建立快取
+    interface.get_status()
+    # 再讓兩種讀取都失敗
+    mock_board.get_full_state = lambda: None
+    mock_board.get_arm_coords = lambda: None
+    # 再次讀取，應返回快取
+    status = interface.get_status()
+    assert status["x"] == 200
+
+
+def test_warmup_calls_get_status(interface, mock_board):
+    """warmup 應調用 get_status 嘗試讀取狀態。"""
+    interface.warmup(beep=False, retries=2, delay=0.01)
+    # MockBoard 的 get_full_state 會被調用
+    assert mock_board._state["z"] > 0
+
+
+def test_warmup_beep_when_enabled(interface, mock_board):
+    """warmup 在 beep=True 時應調用 set_buzzer。"""
+    interface.warmup(beep=True, retries=1, delay=0.01)
+    calls = [c for c, _ in mock_board.calls]
+    assert "set_buzzer" in calls
+
+
 def test_circle_produces_correct_points(interface, mock_board):
     interface.circle(center=(200, 0, 200), radius=50, duration=2, steps=4, wait=False)
     calls = [c for c, _ in mock_board.calls]

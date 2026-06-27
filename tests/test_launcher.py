@@ -2,6 +2,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from robot_agent2 import build_interface, DryRunBoard
+
 
 def run_launcher(args, cwd, timeout=10):
     cmd = [sys.executable, "robot_agent2.py"] + args
@@ -41,3 +43,11 @@ def test_dry_run_once_processes_command(tmp_path, monkeypatch):
     )
     assert result.returncode == 0, result.stderr
     assert "Executed one command" in result.stdout or "[Done] dry home" in result.stdout
+
+
+def test_dry_run_build_interface_skips_warmup(config):
+    """乾跑模式下 build_interface 不應調用 warmup（不會連接真實串口）。"""
+    interface = build_interface(config, dry_run=True)
+    assert isinstance(interface.board, DryRunBoard)
+    calls = [call for call, _ in interface.board.calls]
+    assert "set_buzzer" not in calls

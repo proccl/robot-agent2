@@ -164,11 +164,60 @@ class NexArmInterface:
     def get_status(self) -> Dict:
         """取得並快取當前機械臂狀態。"""
         state = self.board.get_full_state()
+
+        # 若 get_full_state 失敗，嘗試用 get_arm_coords 構造狀態
+        if state is None and hasattr(self.board, "get_arm_coords"):
+            coords = self.board.get_arm_coords()
+            if coords is not None and len(coords) >= 3:
+                state = {
+                    "x": coords[0],
+                    "y": coords[1],
+                    "z": coords[2],
+                    "pitch": 0.0,
+                    "roll": 0,
+                    "claw": 0,
+                    "servos": [],
+                }
+
         if state is None:
+            if self._last_status is not None:
+                return self._last_status
             return {
                 "x": 0, "y": 0, "z": 0,
                 "pitch": 0.0, "roll": 0, "claw": 0,
                 "servos": [],
             }
+
         self._last_status = state
         return state
+
+    def warmup(self, beep: bool = True, retries: int = 5, delay: float = 1.0):
+        """
+        真機啟動後的初始化握手。
+
+        流程：
+        1. 若 beep=True，發送短促蜂鳴器指令喚醒通訊。
+        2. 多次嘗試讀取狀態，直到成功或達到最大重試次數。
+
+        此方法不強制要求成功，失敗僅打印警告。
+        """
+        if beep and hasattr(self.board, "set_buzzer"):
+            try:
+                self.board.set_buzzer(freq=2500, on_time_s=0.1, off_time_s=0.0, repeat=1)
+                print("[*] Warmup beep sent")
+            except Exception as e:
+                print(f"[!] Warmup beep failed: {e}")
+
+        print("[*] Warming up, waiting for arm to respond...")
+        for i in range(retries):
+            try:
+                status = self.get_status()
+                if status and status.get("z", 0) > 0:
+                    print(f"[*] Warmup OK: x={status['x']}, y={status['y']}, z={status['z']}")
+                    return
+            except Exception as e:
+                print(f"[!] Warmup retry {i + 1}/{retries} failed: {e}")
+            if i < retries - 1:
+                time.sleep(delay)
+
+        print("[!] Warmup finished but could not read a valid status (arm may still work)")

@@ -40,6 +40,12 @@ class DryRunBoard:
             "servos": [2048] * 6,
         }
 
+    def get_arm_coords(self):
+        return (self._state["x"], self._state["y"], self._state["z"])
+
+    def set_buzzer(self, freq, on_time_s, off_time_s, repeat=1):
+        self.calls.append(("set_buzzer", (freq, on_time_s, off_time_s, repeat)))
+
 
 def load_config(config_path: str) -> dict:
     with open(config_path, "r", encoding="utf-8") as f:
@@ -52,7 +58,19 @@ def build_interface(cfg: dict, port: str = None, dry_run: bool = False):
     else:
         board = Board(device=port or cfg["port"], baudrate=cfg["baudrate"], timeout=cfg.get("timeout", 0.1))
         board.enable_reception(True)
-    return NexArmInterface(board, cfg)
+
+    interface = NexArmInterface(board, cfg)
+
+    if not dry_run:
+        warmup_cfg = cfg.get("warmup", {})
+        if warmup_cfg.get("enabled", True):
+            interface.warmup(
+                beep=warmup_cfg.get("beep", True),
+                retries=warmup_cfg.get("retries", 5),
+                delay=warmup_cfg.get("delay", 1.0),
+            )
+
+    return interface
 
 
 def main():
@@ -90,14 +108,23 @@ def main():
     try:
         if args.once:
             # 等待並執行一條指令後退出
-            deadline = time.time() + cfg.get("safety_timeout", 10)
-            while time.time() < deadline:
-                if executor.run_once():
-                    print("[*] Executed one command, exiting (--once)")
-                    break
-                time.sleep(executor.poll_interval)
+            safety_timeout = cfg.get("safety_timeout", 10)
+            if safety_timeout:
+                deadline = time.time() + safety_timeout
+                while time.time() < deadline:
+                    if executor.run_once():
+                        print("[*] Executed one command, exiting (--once)")
+                        break
+                    time.sleep(executor.poll_interval)
+                else:
+                    print("[*] No command found within timeout, exiting (--once)")
             else:
-                print("[*] No command found within timeout, exiting (--once)")
+                # safety_timeout 為 0 或 None，無限等待
+                while True:
+                    if executor.run_once():
+                        print("[*] Executed one command, exiting (--once)")
+                        break
+                    time.sleep(executor.poll_interval)
         else:
             executor.run()
     except KeyboardInterrupt:

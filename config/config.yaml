@@ -26,8 +26,15 @@ servo_limits:
   pulse_min: 0
   pulse_max: 4095
 
-# 安全超时（秒）
-safety_timeout: 10
+# 真機啟動初始化配置
+warmup:
+  enabled: true      # 啟動時是否執行初始化握手
+  beep: true         # 是否發送蜂鳴器喚醒（每次啟動響一聲）
+  retries: 5         # 狀態讀取重試次數
+  delay: 1.0         # 每次重試間隔（秒）
+
+# 安全超时（秒），0 表示無限等待（仅影响 --once 模式）
+safety_timeout: 0
 
 # 日志级别：DEBUG / INFO / WARNING / ERROR
 log_level: INFO

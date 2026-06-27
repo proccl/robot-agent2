@@ -75,3 +75,16 @@ def test_busy_lock_skips_new_command(executor, dirs, monkeypatch):
     executed = executor.run_once()
     assert executed is False
     assert script.exists()  # 仍在 incoming 中
+
+
+def test_execution_beep_on_start_and_done(executor, dirs, mock_board):
+    """指令執行開始和成功結束時應調用 set_buzzer。"""
+    incoming = dirs["incoming"]
+    script = incoming / "cmd_20260626_120003_001_beep.py"
+    script.write_text("print('[Done] beep test')", encoding="utf-8")
+
+    executed = executor.run_once()
+    assert executed is True
+
+    buzzer_calls = [call for call, _ in mock_board.calls if call == "set_buzzer"]
+    assert len(buzzer_calls) == 2  # 開始一聲，結束兩聲（調用兩次）

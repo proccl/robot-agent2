@@ -148,7 +148,15 @@ workspace_limits:                  # 工作空間軟限位
 servo_limits:
   pulse_min: 0
   pulse_max: 4095
-safety_timeout: 10                 # --once 等待超時（秒）
+
+# 真機啟動初始化配置
+warmup:
+  enabled: true      # 啟動時是否執行初始化握手
+  beep: true         # 是否發送蜂鳴器喚醒（每次啟動響一聲）
+  retries: 5         # 狀態讀取重試次數
+  delay: 1.0         # 每次重試間隔（秒）
+
+safety_timeout: 0                  # --once 等待超時（秒），0 表示無限等待
 log_level: INFO
 ```
 
@@ -202,7 +210,8 @@ PYEOF
 2. **執行環境**：無需 import，`globals` 已注入 `interface`（`NexArmInterface` 實例）與 `state`（當前狀態字典）
 3. **成功標記**：腳本結尾輸出 `print("[Done] ...")`
 4. **失敗處理**：拋出異常會被 `CommandExecutor` 捕獲，原檔移至 `incoming/failed/`
-5. **座標方向**：
+5. **提示音**：真機模式下，每條指令開始執行時會響一聲蜂鳴，成功結束後會響兩聲；這由 `CommandExecutor` 自動處理，無需在腳本中手動添加
+6. **座標方向**：
    - `dx`：X 軸正方向（機械臂前方）
    - `dy`：Y 軸正方向（左側）
    - `dz`：Z 軸正方向（上方）
@@ -259,6 +268,8 @@ testpaths = tests
 ## 安全注意事項
 
 - **硬體測試前**：必須清空機械臂活動範圍，確認周圍無障礙物
+- **啟動蜂鳴器**：真機模式下，`robot_agent2.py` 啟動時會發出一聲短促蜂鳴，表示正在初始化機械臂通訊；若不需要，可在 `config.yaml` 設 `warmup.beep: false`
+- **指令提示音**：真機模式下，每條指令開始執行時會響一聲蜂鳴，成功結束後會響兩聲；失敗時不會響結束音
 - **並發控制**：`CommandExecutor` 使用 `is_busy` 鎖，移動期間不會執行新指令
 - **軟限位**：所有絕對運動與軌跡點都會檢查 `workspace_limits`，超出範圍拋 `SafetyError`
 - **相對運動**：`relative_move` 目前僅由 SDK 處理邊界，未在 interface 層預先計算目標限位

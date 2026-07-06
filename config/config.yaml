@@ -5,9 +5,9 @@ port: COM5
 baudrate: 1000000
 timeout: 0.1
 
-# NexArm SDK 路径（已棄用，現在使用標準 package import: from Nex_Arm.ros_robot_controller_sdk import Board）
+# NexArm SDK 路径（已棄用，現在使用標準 package import: from sdk.ros_robot_controller_sdk import Board）
 # 保留此項僅為向前兼容舊配置文件
-nexarm_sdk_path: "./Nex_Arm"
+nexarm_sdk_path: "./sdk"
 
 # 默认运动速度（单位：秒）
 default_speed: 1.5

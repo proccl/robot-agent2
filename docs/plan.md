@@ -223,7 +223,7 @@ ls skills/robotagent2-ops/SKILL.md skills/robotagent2-ops/references/
 - `pyserial`
 - `pyyaml`
 - `pytest`（開發依賴）
-- NexArm SDK：`Nex_Arm/ros_robot_controller_sdk.py`（通過相對路徑或 `PYTHONPATH` 引用）
+- NexArm SDK：`sdk/ros_robot_controller_sdk.py`（作為標準 Python package `sdk` 導入）
 
 ## 安全注意事項
 

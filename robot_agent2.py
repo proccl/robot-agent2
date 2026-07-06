@@ -10,7 +10,7 @@ import time
 
 import yaml
 
-from Nex_Arm.ros_robot_controller_sdk import Board
+from sdk.ros_robot_controller_sdk import Board
 from src.nexarm_interface import NexArmInterface
 from src.process_incoming import CommandExecutor
 

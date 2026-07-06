@@ -7,10 +7,13 @@
 ```
 robot-agent2/
 ├── robot_agent2.py               # 一鍵啟動腳本
+├── sdk/                          # NexArm Python SDK
+│   ├── __init__.py
+│   └── ros_robot_controller_sdk.py
 ├── src/
 │   ├── nexarm_interface.py       # 對照 Arm7R.m，封裝 NexArm SDK
 │   └── process_incoming.py       # 對照 processIncomingCommands.m，文件隊列執行器
-├── config/config.yaml            # 串口、速度、安全限位
+├── config/config.yaml            # 串口、速度、安全限位、warmup
 ├── docs/                         # 詳細文檔
 ├── tests/                        # pytest 測試
 ├── skills/robotagent2-ops/       # Kimi CLI 項目 skill
@@ -22,11 +25,14 @@ robot-agent2/
 ## Quick Start
 
 ```bash
-cd "D:/software package/NexArm模仿学习机械臂/NexArm模仿学习机械臂/robot-agent2"
+cd "D:/software package/NexArm模仿学习机械臂/robot-agent2"
 . .venv/Scripts/activate
 
 # 啟動 agent（乾跑模式測試）
 python robot_agent2.py --dry-run --once --poll-interval 0.5
+
+# 真機模式（持續後台值守）
+python robot_agent2.py --port COM5 --poll-interval 0.5
 
 # 投放一條指令
 cat > incoming/cmd_$(date +%Y%m%d_%H%M%S)_001_home.py << 'PYEOF'
@@ -34,6 +40,15 @@ interface.home(duration=2)
 print("[Done] home")
 PYEOF
 ```
+
+## PyCharm 運行配置
+
+項目已包含兩個運行配置：
+
+- `robot-agent2 dry-run`：`--dry-run --once --poll-interval 0.5`
+- `robot-agent2 hardware`：`--port COM5 --poll-interval 0.5`（持續值守，無 `--once`）
+
+兩個配置均固定使用 Anaconda Python 3.12 解釋器。
 
 ## 與 MATLAB robot-agent 對照
 
@@ -58,8 +73,28 @@ PYEOF
 | line | `interface.line(target=(x,y,z), duration=4)` |
 | get_status | `interface.get_status()` |
 
+## 指令約定
+
+- 指令文件命名：`incoming/cmd_YYYYMMDD_HHMMSS_XXX_<desc>.py`
+- 腳本中可直接使用 `interface`（`NexArmInterface` 實例）與 `state`（當前狀態字典）
+- 指令成功結尾建議輸出 `print("[Done] ...")`
+- `dx` 為前方，`dy` 為左側，`dz` 為上方
+- 連續指令會按文件隊列順序執行
+
+## 硬件初始化與反饋
+
+- 啟動時會自動執行 `warmup()`：蜂鳴 + 多次讀取狀態，確認固件就緒
+- 每條指令開始時蜂鳴 1 聲，成功結束時蜂鳴 2 聲
+- `get_status()` 採用 fallback 鏈：`get_full_state()` → `get_arm_coords()` → 緩存狀態
+
 ## 安全
 
 - 所有運動指令有軟限位檢查
 - `is_busy` 鎖防止並發執行
-- 執行硬體測試前請清空機械臂活動範圍
+- `safety_timeout: 0` 表示 `--once` 模式無限等待，不會因超時退出
+- 執行硬件測試前請清空機械臂活動範圍
+
+## 版本
+
+- 當前版本：**v0.0.3**
+- 發布頁面：https://github.com/proccl/robot-agent2/releases

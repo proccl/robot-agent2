@@ -14,6 +14,7 @@ Kimi CLI 操作 `robot-agent2` 的項目 skill。
 - 指令隊列：`incoming/`
 - 指令模板：見 `references/script-templates-reference.md`
 - 指令規範：見 `docs/robot_agent2_cmds.json`
+- 硬件結構與運動學：見 `references/hardware-reference.md`
 - 疑難排解：見 `references/troubleshooting-reference.md`
 
 ## 生成腳本約定
@@ -68,6 +69,10 @@ D:/Users/HW/anaconda3/python.exe robot_agent2.py --port COM5 --once --poll-inter
 - **多步指令會依序執行**：`nexarm_interface.py` 的運動方法預設 `wait=True`，會根據 `duration` 自動等待，所以腳本內連續指令不會重疊。
 - **安全提醒**：每次實機運動前必須確認周圍無障礙物；先執行 `home` 確認狀態再進行其他運動。
 - **狀態讀取**：`interface.get_status()` 內部優先使用 `get_full_state()`，失敗時會自動後備到 `get_arm_coords()`。真機上若看到 `z=0` 導致限位錯誤，通常是啟動時未完成 warmup。
+- **關節型號與縮放**：經實機確認，底座 θ1 為 HX-65HM，大臂 θ2 為 HX-30HM，小臂 θ3 為 HX-12H，腕部 pitch θ4 為 HX-10HM，腕部 roll θ5 為 **HX-12H**，夾爪為 HX-10HM。下位機會將各舵機脈衝統一映射到內部 0–4095 坐標，詳見 `references/hardware-reference.md`。
+- **roll 縮放**：更新下位機最新代碼後，`roll` 指令值與實際角度為 **1:1**，可達 ±90°。
+- **夾爪範圍**：夾爪實際機械範圍約 **-90° ~ +67.4°**；`claw` 在 -90 ~ 70 範圍內線性可控，超過 +70 後進入機械限位。
+- **單關節脈衝控制**：可用 `interface.board.arm_move_servo_single(servo_id, pos, time_ms)` 直接控制，其中 `pos` 為下位機內部 0–4095 坐標。
 
 ## 疑難排解
 

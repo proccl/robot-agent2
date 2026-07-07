@@ -96,5 +96,25 @@ PYEOF
 
 ## 版本
 
-- 當前版本：**v0.0.3**
+- 當前版本：**v0.0.4**
 - 發布頁面：https://github.com/proccl/robot-agent2/releases
+
+### v0.0.4 更新內容
+
+- **硬件標定**
+  - 確認腕部 roll（θ5）舵機型號為 **HX-12H**（非 HX-10HM）
+  - 確認下位機將各舵機脈衝統一映射到內部 0–4095 坐標
+  - 更新下位機最新代碼後，`roll` 指令值與實際角度達到 **1:1**
+  - 測量底座 θ1 轉動區間：**-158.3° ~ +160.1°**
+  - 驗證 roll 可達 **±90°**
+  - 測量夾爪開合範圍：**-90.0° ~ +67.4°**，`claw > 70` 後進入機械限位
+- **文檔與 Skill**
+  - 更新 `skills/robotagent2-ops/references/hardware-reference.md`
+  - 更新 `skills/robotagent2-ops/SKILL.md` 實戰經驗
+
+### v0.0.3 更新內容
+
+- 初始項目結構與基本運動指令
+- 文件隊列執行器 `process_incoming.py`
+- `nexarm_interface.py` 高層運動 API
+- pytest 測試與 PyCharm 運行配置

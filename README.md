@@ -24,9 +24,33 @@ robot-agent2/
 
 ## Quick Start
 
+> 請先將下方的 `<project-path>` 替換為你本機的實際專案路徑。
+
+### Windows (PowerShell)
+
+```powershell
+cd "<project-path>"
+. .venv\Scripts\Activate.ps1
+
+# 啟動 agent（乾跑模式測試）
+python robot_agent2.py --dry-run --once --poll-interval 0.5
+
+# 真機模式（持續後台值守）
+python robot_agent2.py --port COM5 --poll-interval 0.5
+
+# 投放一條指令
+$timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+@"
+interface.home(duration=2)
+print("[Done] home")
+"@ | Set-Content -Encoding UTF8 "incoming/cmd_${timestamp}_001_home.py"
+```
+
+### Linux / macOS (Bash)
+
 ```bash
-cd "D:/software package/NexArm模仿学习机械臂/robot-agent2"
-. .venv/Scripts/activate
+cd "<project-path>"
+. .venv/bin/activate
 
 # 啟動 agent（乾跑模式測試）
 python robot_agent2.py --dry-run --once --poll-interval 0.5

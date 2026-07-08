@@ -120,8 +120,18 @@ PYEOF
 
 ## 版本
 
-- 當前版本：**v0.0.4**
+- 當前版本：**v0.0.5**
 - 發布頁面：https://github.com/proccl/robot-agent2/releases
+
+### v0.0.5 更新內容
+
+- **Issue #2 修復：Quick Start Windows 兼容性**
+  - 將 Quick Start 拆分為 **Windows (PowerShell)** 和 **Linux / macOS (Bash)** 兩個區塊
+  - 把絕對路徑改為通用佔位符 `<project-path>`
+  - 新增 `tests/test_docs.py` 回歸測試，確保 PowerShell 區塊不含 Bash-only 語法
+- **文檔與測試**
+  - 新增 `docs/plan.md` 計劃備份
+  - `test_skill_files_exist` 加入 `hardware-reference.md` 存在性檢查
 
 ### v0.0.4 更新內容
 

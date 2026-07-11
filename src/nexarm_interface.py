@@ -8,6 +8,8 @@ from typing import Dict, List, Optional, Tuple
 import math
 import time
 
+from src.natural_language import NaturalLanguagePlanner
+
 
 class SafetyError(ValueError):
     """目標位置或參數超出安全範圍。"""
@@ -33,6 +35,7 @@ class NexArmInterface:
         self.workspace_limits = self.config.get("workspace_limits", {})
         self.servo_limits = self.config.get("servo_limits", {"pulse_min": 0, "pulse_max": 4095})
         self._last_status = None
+        self._planner: Optional[NaturalLanguagePlanner] = None
 
     # ------------------------------------------------------------------ #
     # 工具方法
@@ -221,3 +224,47 @@ class NexArmInterface:
                 time.sleep(delay)
 
         print("[!] Warmup finished but could not read a valid status (arm may still work)")
+
+    def attach_planner(self, planner: NaturalLanguagePlanner):
+        """Attach a NaturalLanguagePlanner for ask_llm()."""
+        self._planner = planner
+
+    def ask_llm(self, instruction: str, execute: bool = False, save: bool = True,
+                planner: Optional[NaturalLanguagePlanner] = None) -> str:
+        """
+        使用 LLM 將自然語言指令轉換為 Python 腳本。
+
+        Parameters
+        ----------
+        instruction : str
+            自然語言指令，例如 "move forward 50 mm"。
+        execute : bool
+            是否立即執行生成的腳本。
+        save : bool
+            是否將腳本保存到 incoming/ 目錄。
+        planner : NaturalLanguagePlanner, optional
+            可覆蓋已附加的 planner。
+
+        Returns
+        -------
+        str
+            生成的 Python 腳本內容。
+        """
+        active = planner or self._planner
+        if active is None:
+            active = NaturalLanguagePlanner.from_config()
+            self._planner = active
+
+        script = active.generate_script(instruction)
+        if save:
+            path = active.save_script(instruction, script)
+            print(f"[*] LLM script saved to {path}")
+        if execute:
+            state = self.get_status()
+            script_globals = {
+                "__name__": "__main__",
+                "interface": self,
+                "state": state,
+            }
+            exec(script, script_globals)
+        return script

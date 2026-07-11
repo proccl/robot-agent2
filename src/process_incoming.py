@@ -14,6 +14,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+from src.natural_language import NaturalLanguagePlanner
+
 
 class CommandExecutor:
     """
@@ -35,12 +37,14 @@ class CommandExecutor:
         主循環輪詢間隔（秒）。
     """
 
-    def __init__(self, interface, incoming_dir: str = "incoming",
+    def __init__(self, interface, planner: Optional[NaturalLanguagePlanner] = None,
+                 incoming_dir: str = "incoming",
                  history_dir: str = "incoming_history",
                  failed_dir: str = "incoming/failed",
                  logs_dir: str = "logs",
                  poll_interval: float = 0.5):
         self.interface = interface
+        self.planner = planner
         self.incoming_dir = Path(incoming_dir)
         self.history_dir = Path(history_dir)
         self.failed_dir = Path(failed_dir)
@@ -71,9 +75,10 @@ class CommandExecutor:
         self.logger.info("CommandExecutor initialized.")
 
     def scan(self) -> list:
-        """掃描並按檔名排序返回 cmd_*.py 路徑。"""
-        pattern = self.incoming_dir / "cmd_*.py"
-        files = glob.glob(str(pattern))
+        """掃描並按檔名排序返回 cmd_*.py 與 cmd_*.txt 路徑。"""
+        py_pattern = self.incoming_dir / "cmd_*.py"
+        txt_pattern = self.incoming_dir / "cmd_*.txt"
+        files = glob.glob(str(py_pattern)) + glob.glob(str(txt_pattern))
         files.sort()
         return files
 
@@ -92,7 +97,7 @@ class CommandExecutor:
             pass
 
     def execute_script(self, script_path: str):
-        """執行單個腳本。"""
+        """執行單個腳本；.txt 會先由 NaturalLanguagePlanner 轉成 .py。"""
         script_path = Path(script_path)
         self._busy = True
         self.logger.info(f"Executing {script_path.name}")
@@ -101,25 +106,45 @@ class CommandExecutor:
         self._beep(repeat=1)
 
         try:
-            state = self.interface.get_status()
-            script_globals = {
-                "__name__": "__main__",
-                "interface": self.interface,
-                "state": state,
-            }
-            with open(script_path, "r", encoding="utf-8") as f:
-                source = f.read()
-            exec(source, script_globals)
-            self.logger.info(f"[Done] {script_path.name}")
-            # 指令成功結束提示音
-            self._beep(repeat=2)
-            self._archive(script_path, success=True)
+            if script_path.suffix == ".txt":
+                self._execute_text(script_path)
+            else:
+                self._execute_python(script_path)
         except Exception as e:
             self.logger.error(f"[ERR] {script_path.name}: {e}")
             self.logger.error(traceback.format_exc())
             self._archive(script_path, success=False)
         finally:
             self._busy = False
+
+    def _execute_text(self, txt_path: Path):
+        """將自然語言 .txt 轉為 Python 腳本並執行。"""
+        if self.planner is None:
+            raise RuntimeError(
+                "No NaturalLanguagePlanner configured; cannot process .txt instruction"
+            )
+        instruction = txt_path.read_text(encoding="utf-8").strip()
+        generated_path = self.planner.plan_and_save(instruction)
+        self.logger.info(f"Generated {generated_path.name} from {txt_path.name}")
+        # 原始 .txt 歸檔到 history
+        self._archive(txt_path, success=True)
+        self._execute_python(generated_path)
+
+    def _execute_python(self, script_path: Path):
+        """執行 Python 腳本。"""
+        state = self.interface.get_status()
+        script_globals = {
+            "__name__": "__main__",
+            "interface": self.interface,
+            "state": state,
+        }
+        with open(script_path, "r", encoding="utf-8") as f:
+            source = f.read()
+        exec(source, script_globals)
+        self.logger.info(f"[Done] {script_path.name}")
+        # 指令成功結束提示音
+        self._beep(repeat=2)
+        self._archive(script_path, success=True)
 
     def _archive(self, script_path: Path, success: bool):
         """歸檔腳本：無論成功與否都備份到 history；失敗時額外移至 failed。"""

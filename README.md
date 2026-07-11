@@ -12,8 +12,11 @@ robot-agent2/
 │   └── ros_robot_controller_sdk.py
 ├── src/
 │   ├── nexarm_interface.py       # 對照 Arm7R.m，封裝 NexArm SDK
-│   └── process_incoming.py       # 對照 processIncomingCommands.m，文件隊列執行器
-├── config/config.yaml            # 串口、速度、安全限位、warmup
+│   ├── process_incoming.py       # 對照 processIncomingCommands.m，文件隊列執行器
+│   ├── llm_client.py             # OpenAI-compatible LLM 客戶端
+│   ├── skill_context.py          # 項目 Skill / 參考資料檢索
+│   └── natural_language.py       # 自然語言指令轉 Python 腳本
+├── config/config.yaml            # 串口、速度、安全限位、warmup、LLM 配置
 ├── docs/                         # 詳細文檔
 ├── tests/                        # pytest 測試
 ├── skills/robotagent2-ops/       # Kimi CLI 項目 skill
@@ -38,6 +41,9 @@ python robot_agent2.py --dry-run --once --poll-interval 0.5
 # 真機模式（持續後台值守）
 python robot_agent2.py --port COM5 --poll-interval 0.5
 
+# 真機模式 + 同時啟動 chat 線程
+python robot_agent2.py --port COM5 --poll-interval 0.5 --with-chat
+
 # 投放一條指令
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 @"
@@ -58,6 +64,9 @@ python robot_agent2.py --dry-run --once --poll-interval 0.5
 # 真機模式（持續後台值守）
 python robot_agent2.py --port COM5 --poll-interval 0.5
 
+# 真機模式 + 同時啟動 chat 線程
+python robot_agent2.py --port COM5 --poll-interval 0.5 --with-chat
+
 # 投放一條指令
 cat > incoming/cmd_$(date +%Y%m%d_%H%M%S)_001_home.py << 'PYEOF'
 interface.home(duration=2)
@@ -65,14 +74,88 @@ print("[Done] home")
 PYEOF
 ```
 
+## 自然語言指令
+
+除了直接編寫 `incoming/cmd_*.py`，你也可以用自然語言投放指令：
+
+### 方式一：投放 `.txt` 文件
+
+agent 會自動調用 LLM 將 `.txt` 轉為 `.py` 並執行。
+
+```powershell
+# Windows (PowerShell)
+$timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+"請將機械臂回到零位" | Set-Content -Encoding UTF8 "incoming/cmd_${timestamp}_001_home.txt"
+```
+
+```bash
+# Linux / macOS (Bash)
+cat > incoming/cmd_$(date +%Y%m%d_%H%M%S)_001_home.txt << 'EOF'
+請將機械臂回到零位
+EOF
+```
+
+### 方式二：啟動 `--chat` 純對話模式
+
+```bash
+python robot_agent2.py --chat
+```
+
+這是純 LLM 對話模式，不連接機械臂，適合調試上下文與腳本生成。
+
+### 方式三：與機械臂值守同時運行 chat
+
+```bash
+python robot_agent2.py --port COM5 --poll-interval 0.5 --with-chat
+```
+
+這會在後台啟動一個 chat 線程。你輸入自然語言後，LLM 會生成腳本並自動放入 `incoming/`，由 executor 依序執行。
+
+### 方式四：通過 Kimi CLI 直接控制
+
+如果你正在使用 Kimi CLI，也可以直接告訴我動作，例如「前向 100，然後回零位」。我會生成腳本並投放至 `incoming/`，由正在運行的 agent 自動執行。
+
+### 方式五：Python API `ask_llm()`
+
+```python
+script = interface.ask_llm("向前移動 50 mm", execute=False, save=True)
+interface.ask_llm("向前移動 50 mm", execute=True, save=True)
+```
+
+### LLM 配置
+
+在 `config/config.yaml` 中配置 provider、model、API key 環境變量：
+
+```yaml
+llm:
+  provider: sjtu
+  base_url: https://models.sjtu.edu.cn/api/v1
+  model: qwen3.6-27b
+  api_key_env: SJTU_API_KEY
+  default_temperature: 0.3
+  default_max_tokens: 2048
+  skill_context:
+    - skills/robotagent2-ops/SKILL.md
+    - skills/robotagent2-ops/references/script-templates-reference.md
+    - skills/robotagent2-ops/references/hardware-reference.md
+    - docs/robot_agent2_cmds.json
+```
+
+運行前設置環境變量：
+
+```powershell
+$env:SJTU_API_KEY="your-api-key"
+```
+
 ## PyCharm 運行配置
 
-項目已包含兩個運行配置：
+項目已包含三個運行配置：
 
 - `robot-agent2 dry-run`：`--dry-run --once --poll-interval 0.5`
 - `robot-agent2 hardware`：`--port COM5 --poll-interval 0.5`（持續值守，無 `--once`）
+- `robot-agent2 hardware + chat`：`--port COM5 --poll-interval 0.5 --with-chat`（值守並啟動 LLM chat）
 
-兩個配置均固定使用 Anaconda Python 3.12 解釋器。
+三個配置均固定使用 Anaconda Python 3.12 解釋器。
 
 ## 與 MATLAB robot-agent 對照
 
@@ -81,9 +164,12 @@ PYEOF
 | `robotagent.m` | `robot_agent2.py` |
 | `src/Arm7R.m` | `src/nexarm_interface.py` |
 | `src/processIncomingCommands.m` | `src/process_incoming.py` |
-| `incoming/cmd_*.m` | `incoming/cmd_*.py` |
+| `incoming/cmd_*.m` | `incoming/cmd_*.py` / `incoming/cmd_*.txt` |
 | `incoming_history/` | `incoming_history/` |
 | `logs/log_*.txt` | `logs/robot_agent2_*.log` |
+| - | `src/llm_client.py` |
+| - | `src/skill_context.py` |
+| - | `src/natural_language.py` |
 
 ## 核心指令
 
@@ -120,8 +206,21 @@ PYEOF
 
 ## 版本
 
-- 當前版本：**v0.0.5**
+- 當前版本：**v0.0.6**
 - 發布頁面：https://github.com/proccl/robot-agent2/releases
+
+### v0.0.6 更新內容
+
+- **SJTU LLM 集成**
+  - 新增 `src/llm_client.py`：OpenAI-compatible 標準庫客戶端，支持流式與非流式
+  - 新增 `src/skill_context.py`：按 Markdown 標題切分 chunk，基於關鍵詞重疊度檢索相關 Skill
+  - 新增 `src/natural_language.py`：自然語言 → Python 腳本生成與保存
+  - `process_incoming.py` 支持 `incoming/cmd_*.txt`，自動轉為 `.py` 並執行
+  - `robot_agent2.py` 新增 `--chat` 與 `--with-chat` 終端交互模式
+  - `--with-chat` 可在機械臂值守時並行運行 chat 線程，輸入自然語言後自動生成並執行腳本
+  - `NexArmInterface` 新增 `ask_llm()` 方法
+  - `config/config.yaml` 新增 `llm` 節點與 `SJTU_API_KEY` 環境變量配置
+  - 新增對應 pytest 測試：`test_llm_client.py`、`test_skill_context.py`、`test_natural_language.py`、`test_launcher.py` 擴展
 
 ### v0.0.5 更新內容
 

@@ -3,6 +3,8 @@ import time
 from pathlib import Path
 import pytest
 from src.process_incoming import CommandExecutor
+from src.natural_language import NaturalLanguagePlanner
+from src.skill_context import SkillContext
 
 
 @pytest.fixture
@@ -15,12 +17,42 @@ def dirs(tmp_path):
     }
 
 
+class MockLLMClient:
+    def __init__(self, response="interface.home()\nprint('done')"):
+        self.response = response
+
+    def chat(self, messages):
+        return self.response
+
+
+@pytest.fixture
+def planner(dirs):
+    client = MockLLMClient("interface.home()\nprint('done')")
+    skill = SkillContext([])
+    return NaturalLanguagePlanner(client, skill, dirs["incoming"])
+
+
 @pytest.fixture
 def executor(mock_board, config, dirs):
     from src.nexarm_interface import NexArmInterface
     interface = NexArmInterface(mock_board, config)
     return CommandExecutor(
         interface=interface,
+        incoming_dir=str(dirs["incoming"]),
+        history_dir=str(dirs["history"]),
+        failed_dir=str(dirs["failed"]),
+        logs_dir=str(dirs["logs"]),
+        poll_interval=0.01,
+    )
+
+
+@pytest.fixture
+def txt_executor(mock_board, config, dirs, planner):
+    from src.nexarm_interface import NexArmInterface
+    interface = NexArmInterface(mock_board, config)
+    return CommandExecutor(
+        interface=interface,
+        planner=planner,
         incoming_dir=str(dirs["incoming"]),
         history_dir=str(dirs["history"]),
         failed_dir=str(dirs["failed"]),
@@ -75,6 +107,41 @@ def test_busy_lock_skips_new_command(executor, dirs, monkeypatch):
     executed = executor.run_once()
     assert executed is False
     assert script.exists()  # 仍在 incoming 中
+
+
+def test_scan_includes_txt_files(executor, dirs):
+    incoming = dirs["incoming"]
+    (incoming / "cmd_20260626_120000_001_a.py").write_text("print('ok')", encoding="utf-8")
+    (incoming / "cmd_20260626_120000_002_b.txt").write_text("go home", encoding="utf-8")
+    files = executor.scan()
+    names = [Path(f).name for f in files]
+    assert "cmd_20260626_120000_001_a.py" in names
+    assert "cmd_20260626_120000_002_b.txt" in names
+
+
+def test_txt_instruction_is_converted_and_executed(txt_executor, dirs):
+    incoming = dirs["incoming"]
+    txt = incoming / "cmd_20260626_120000_001_home.txt"
+    txt.write_text("return to home", encoding="utf-8")
+
+    executed = txt_executor.run_once()
+    assert executed is True
+    assert not txt.exists()
+    assert (dirs["history"] / txt.name).exists()
+    generated = list(dirs["history"].glob("cmd_*.py"))
+    assert len(generated) >= 1
+
+
+def test_txt_without_planner_moves_to_failed(executor, dirs):
+    incoming = dirs["incoming"]
+    txt = incoming / "cmd_20260626_120000_001_no_planner.txt"
+    txt.write_text("go home", encoding="utf-8")
+
+    executed = executor.run_once()
+    assert executed is True
+    assert not txt.exists()
+    assert (dirs["history"] / txt.name).exists()
+    assert (dirs["failed"] / txt.name).exists()
 
 
 def test_execution_beep_on_start_and_done(executor, dirs, mock_board):

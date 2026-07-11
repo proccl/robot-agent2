@@ -1,6 +1,8 @@
 import pytest
 import math
 from src.nexarm_interface import SafetyError
+from src.natural_language import NaturalLanguagePlanner
+from src.skill_context import SkillContext
 
 
 def test_home_calls_arm_all_reset(interface, mock_board):
@@ -128,3 +130,32 @@ def test_wait_blocks(interface, mock_board):
     interface.relative_move(dx=10, dy=0, dz=0, duration=0.3, wait=True)
     elapsed = time.time() - start
     assert elapsed >= 0.25, f"wait 應至少阻塞 duration 時間，實際只等了 {elapsed:.3f}s"
+
+
+class MockLLMClient:
+    def __init__(self, response="interface.home()\nprint('done')"):
+        self.response = response
+
+    def chat(self, messages):
+        return self.response
+
+
+@pytest.fixture
+def interface_with_planner(interface, tmp_path):
+    client = MockLLMClient("interface.home()\nprint('done')")
+    skill = SkillContext([])
+    planner = NaturalLanguagePlanner(client, skill, tmp_path / "incoming")
+    interface.attach_planner(planner)
+    return interface
+
+
+def test_ask_llm_generates_script(interface_with_planner):
+    script = interface_with_planner.ask_llm("go home", execute=False, save=False)
+    assert "interface.home()" in script
+
+
+def test_ask_llm_executes_generated_script(interface_with_planner, mock_board):
+    script = interface_with_planner.ask_llm("go home", execute=True, save=False)
+    assert "interface.home()" in script
+    calls = [c for c, _ in mock_board.calls]
+    assert "arm_all_reset" in calls

@@ -29,3 +29,4 @@ Thumbs.db
 # MATLAB backups (if any)
 *.asv
 *.m~
+*.local.ps1

@@ -57,6 +57,23 @@ print("[Done] sequence")
 
 由於運動方法預設 `wait=True`，以上三步會依序完成，不會重疊。
 
+## Chat 模式生成腳本約定
+
+當用戶使用 `--with-chat` 或投放 `.txt` 自然語言指令時，LLM 應遵循以下格式：
+
+1. 只返回 Python 腳本本體，不要過多解釋。
+2. 使用 markdown 圍欄包裹腳本：
+
+```python
+interface.relative_move(dx=100, dy=0, dz=0, duration=2)
+interface.home(duration=2)
+print("[Done] forward 100mm then home")
+```
+
+3. 腳本開頭不需要 `import`，直接使用 `interface` 與 `state`。
+4. 每條運動指令後無需手動 `time.sleep()`，因為 `interface` 方法預設 `wait=True`。
+5. 結尾必須輸出 `print("[Done] ...")`。
+
 ## 注意事項
 
 - 腳本內直接使用 `interface` 和 `state`，無需 import

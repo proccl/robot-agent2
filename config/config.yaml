@@ -38,3 +38,17 @@ safety_timeout: 0
 
 # 日志级别：DEBUG / INFO / WARNING / ERROR
 log_level: INFO
+
+# LLM 配置（用於自然語言指令生成）
+llm:
+  provider: sjtu
+  base_url: https://models.sjtu.edu.cn/api/v1
+  model: qwen3.6-27b
+  api_key_env: SJTU_API_KEY
+  default_temperature: 0.3
+  default_max_tokens: 2048
+  skill_context:
+    - skills/robotagent2-ops/SKILL.md
+    - skills/robotagent2-ops/references/script-templates-reference.md
+    - skills/robotagent2-ops/references/hardware-reference.md
+    - docs/robot_agent2_cmds.json
